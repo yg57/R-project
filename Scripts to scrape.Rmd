@@ -1,0 +1,140 @@
+---
+title: "HW 9 Group 12"
+output: pdf_document
+---
+
+### scrape data from website
+```{r,echo=TRUE}
+library(XML)
+local_file <- "F:/Rscrape/advfn.html"
+get_table <- function(tickers) {
+  # temp <- data.frame(ncol=5)
+  # colnames(temp) <- c("avg_monthly_high", "avg_monthly_low",
+  #                     "avg_snow_rain","Days_with_precipitation",
+  #                     "Hr_of_sunshine")
+  temp = setNames(data.frame(matrix(ncol = 5, nrow = 0)), c("avg_monthly_high", "avg_monthly_low",
+                                                            "avg_snow_rain","Days_with_precipitation",
+                                                            "Hr_of_sunshine"))
+  ntickers <- length(tickers)
+  
+  for(ticker in 1:ntickers){
+    #ticker <- 2
+    url <- paste0("http://www.worldclimate.com/climate/us/",tickers[ticker])
+    download.file(url, destfile =local_file)
+    
+    doc <- htmlParse(local_file)
+    
+    # get table
+    node <- getNodeSet(doc, "table")
+    tbl<-readHTMLTable(url[1])[[1]]
+    
+    # merge table
+    tbl = t(tbl)
+    tbl = tbl[-1,]
+    temp = rbind(temp,tbl)
+    #temp = merge(temp,tbl)
+    write.csv(temp,"F:/Rscrape/temp.csv")
+  }
+  return(temp)
+}
+
+tickers <- c("alabama","connecticut","alaska","arizona","arkansas",
+             "california","colorado","connecticut","delaware","district-of-columbia",
+             "florida","georgia","hawaii","idaho","illinois","indiana",
+             "iowa","kansas",
+             "kentucky","louisiana","maine","maryland","massachusetts","michigan",
+             "minnesota","mississippi","missouri","montana","nebraska",
+             "nevada","new-hampshire","new-jersey",
+             "new-mexico","new-york","north-carolina","north-dakota","ohio",
+             "oklahoma","oregon","pennsylvania", "rhode-island","south-carolina",
+             "south-dakota","tennessee","texas","utah","vermont",
+             "virginia","washington","west-virginia",
+             "wisconsin","wyoming","alabama/birmingham","alaska/anchorage",
+             "arizona/phoenix",
+             "arkansas/fort-smith","california/berkeley","colorado/grand-junction",
+             "connecticut/stafford",
+             "delaware/georgetown","district-of-columbia/washington",
+             "florida/miami",
+             "georgia/atlanta","idaho/boise","illinois/chicago",
+             "indiana/indianapolis",
+             "iowa/des-moines","kansas/kansas-city","kentucky/louisville",
+             "louisiana/baton-rouge",
+             "maine/augusta","maryland/baltimore","massachusetts/boston",
+             "michigan/lansing",
+             "minnesota/saint-paul","mississippi/biloxi","missouri/kansas-city",
+             "montana/great-falls","nebraska/lincoln","nevada/las-vegas",
+             "new-hampshire/manchester","new-mexico/albuquerque",
+             "north-carolina/raleigh","north-dakota/fargo","ohio/columbus",
+             "oklahoma/oklahoma-city")
+get_table(tickers)
+```
+
+The data source:http://www.worldclimate.com/climate/us/
+
+We have scraped climate data of all us states and some popular tourism cities. The climate data we scaped included Monthly average high temperature,monthly average low temperature, average snow/rain, days with precipitation and hours of sunshine.
+
+Since our main source of data is about Airbnb's hotel orders' distribution, description and detail information of room types and price. Also climate factor will influence user's choice of traveling and booking hotels. With the exact climate and temperature data obtained from relaiable source, we can analyze which month tourists would like to travel  and whether tourist will choose a warm climate to travel around. Besides, whether climate will influence users' choices on airbnb's hotels or which hotel's amentity will attract more users in different climate.
+
+We get total 1032 rows of climate data from website.
+
+### load to database
+```{r,echo=TRUE}
+library(RSQLite)
+dcon <- dbConnect(SQLite(), dbname = "F:/google/RRproject.db")
+dbListTables(dcon)
+dbListFields(dcon, "Webclimate") 
+```
+
+### total number of the dataset
+```{r,echo=TRUE}
+res <- dbSendQuery(conn = dcon, "
+SELECT count(*)
+FROM webclimate;
+")
+mydf <- dbFetch(res, -1)
+dbClearResult(res)
+mydf
+```
+```{r,echo=TRUE}
+res <- dbSendQuery(conn = dcon, "
+SELECT *
+FROM webclimate
+where City = 'florida' ;
+")
+mydf <- dbFetch(res, -1)
+dbClearResult(res)
+head(mydf,n=6)
+
+```
+eg:
+We can select temperature easily to analyze price trend, orders time, maxium stay nights' relations with temperature changes.
+```{r}
+                                                              
+library(ggplot2)
+theme1 <- theme_bw()+
+theme(axis.text = element_text(size = 8, colour = "#6b3447"),
+axis.title = element_text(size = 10, colour = "#2f2f63"),
+legend.title = element_text(size = 8, colour = "#2f2f63"),
+legend.text = element_text(size = 8, colour = "#6b3447"),
+title = element_text(size = 12, colour = "#2f2f63"),
+axis.ticks = element_line(colour = "#6b3447"),
+plot.caption = element_text(size = 8, colour = "#2f2f63"),
+plot.subtitle = element_text(size = 10, colour = "#2f2f63"))
+cbPalette <- c("#CC79A7", "#D55E00", "#56B4E9", "#F0E442",
+"#009E73", "#0072B2", "#999999", "#E69F00")
+ggplot(data = mydf) +
+geom_bar(aes(x=Hightem),fill="#CC79A7")+
+theme1+
+theme(axis.text.x=element_text(angle=25,hjust = 1,size=10),
+                               title=element_text(size=10),
+                              axis.title.x=element_text(size=10),
+                              axis.title.y=element_text(size=10),
+                              axis.text.y=element_text(size=10))+
+  labs(x="High tem",y="florida",
+       title = "Florida monthly tem trend ")
+
+```
+
+
+
+

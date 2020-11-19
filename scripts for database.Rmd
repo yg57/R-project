@@ -1,0 +1,311 @@
+---
+title: "projectR"
+author: "Yawen Guo"
+date: "11/12/2019"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r,include=FALSE}
+recom <- read.csv(file="D:/Rproject/recommandation.csv", header=TRUE, sep=",")
+library(RSQLite)
+dcon <- dbConnect(SQLite(), dbname = "F:/google/RRproject.db")
+library(dplyr)
+library(stringr)
+res <- dbSendQuery(conn = dcon, "
+SELECT SUM(substr(price, 2)) as totalprice,city
+from Europe 
+group by city
+having totalprice > 100000;
+")
+mydf <- dbFetch(res, -1)
+dbClearResult(res)
+```
+
+```{r,echo=FALSE}
+res <- dbSendQuery(conn = dcon, "
+SELECT distinct city
+from Europe;
+")
+mydf2 <- dbFetch(res, -1)
+dbClearResult(res)
+```
+
+
+
+```{r,echo=FALSE}
+library(ggplot2)
+theme1 <- theme_bw()+ 
+theme(axis.text = element_text(size = 8, colour = "#6b3447"),
+axis.title = element_text(size = 10, colour = "#2f2f63"),
+legend.title = element_text(size = 8, colour = "#2f2f63"),
+legend.text = element_text(size = 8, colour = "#6b3447"),
+title = element_text(size = 12, colour = "#2f2f63"),
+axis.ticks = element_line(colour = "#6b3447"),
+plot.caption = element_text(size = 8, colour = "#2f2f63"),
+plot.subtitle = element_text(size = 10, colour = "#2f2f63"))
+cbPalette <- c("#CC79A7", "#D55E00", "#56B4E9", "#F0E442",
+"#009E73", "#0072B2", "#999999", "#E69F00")
+
+```
+
+### The point plot of different cities' total price trend
+
+```{r}
+ggplot(mydf,aes(city,totalprice/100)) +
+geom_point(aes(col=city))+
+theme1+
+theme(axis.text.x=element_text(angle=45,hjust = 1,size=7),
+                               title=element_text(size=10),
+                              axis.title.x=element_text(size=10),
+                              axis.title.y=element_text(size=10),
+                              axis.text.y=element_text(size=10))+
+  labs(x="city",y="total price(hundreds)",
+       title = "price trend")
+
+```
+
+Since the price of data is obtained from already finished users' order and all data collected time is in 2019. Compute the total price of each hotels and group by cities. We can clearly see each city's airbnb revenue distribution.
+
+## For HW 10
+### Combining related plots into one visualization use grid
+#### Here we combine the price trend of different part location together, that is, combine the price trend of Europe,US and Others.
+
+```{r}
+res <- dbSendQuery(conn = dcon, "
+SELECT id, name, bedrooms, bathrooms, amenities, city, SUM(substr(price, 2)) as totalprice, SUM(maximum_nights), SUM(minimum_nights)
+from Europe
+where maximum_nights>365
+group by city
+having count(city)>300 ;
+")
+mydf1 <- dbFetch(res, -1)
+dbClearResult(res)
+```
+
+
+```{r}
+theme_set(theme_bw())  # pre-set the bw theme.
+a<-ggplot(mydf, aes(x=city, y=totalprice/100)) + 
+  geom_bar(stat="identity", width=0.8, fill="tomato3")+
+theme1+
+theme(axis.text.x=element_text(angle=45,hjust = 1,size=7),
+                               title=element_text(size=10),
+                              axis.title.x=element_text(size=10),
+                              axis.title.y=element_text(size=10),
+                              axis.text.y=element_text(size=10))+
+  labs(x="City in Europe1",y="Total price(hundreds dollars)",
+       title = "Price trend of home-stay")
+
+  
+```
+
+
+
+```{r}
+res <- dbSendQuery(conn = dcon, "
+SELECT SUM(substr(price, 2)) as totalprice,city
+from Europe2 
+group by city
+having totalprice > 140000;
+")
+mydf3 <- dbFetch(res, -1)
+dbClearResult(res)
+```
+```{r}
+theme_set(theme_bw())  # pre-set the bw theme.
+b<-ggplot(mydf3, aes(x=city, y=totalprice/100)) + 
+  geom_bar(stat="identity", width=0.8, fill="#999999")+
+theme1+
+theme(axis.text.x=element_text(angle=45,hjust = 1,size=7),
+                               title=element_text(size=10),
+                              axis.title.x=element_text(size=10),
+                              axis.title.y=element_text(size=10),
+                              axis.text.y=element_text(size=10))+
+  labs(x="City in Europe2",y="Total price(hundreds dollars)",
+       title = "Price trend of home-stay")
+```
+```{r}
+res <- dbSendQuery(conn = dcon, "
+SELECT SUM(substr(price, 2)) as totalprice,city
+from Europe3 
+group by city
+having totalprice > 100000;
+")
+mydf4 <- dbFetch(res, -1)
+dbClearResult(res)
+```
+
+```{r}
+theme_set(theme_bw())  # pre-set the bw theme.
+c<-ggplot(mydf4, aes(x=city, y=totalprice/100)) + 
+  geom_bar(stat="identity", width=0.8, fill="#F0E442")+
+theme1+
+theme(axis.text.x=element_text(angle=75,hjust = 1,size=10),
+                               title=element_text(size=10),
+                              axis.title.x=element_text(size=10),
+                              axis.title.y=element_text(size=10),
+                              axis.text.y=element_text(size=10))+
+  labs(x="City in Europe3",y="Total price(hundreds dollars)",
+       title = "Price trend of home-stay")
+```
+
+```{r}
+res <- dbSendQuery(conn = dcon, "
+SELECT SUM(substr(price, 2)) as totalprice,city
+from US1 
+group by city
+having totalprice > 100000;
+")
+mydf5 <- dbFetch(res, -1)
+dbClearResult(res)
+theme_set(theme_bw())  # pre-set the bw theme.
+d<-ggplot(mydf5, aes(x=city, y=totalprice/100)) + 
+  geom_bar(stat="identity", width=0.8, fill="#CC79A7")+
+theme1+
+theme(axis.text.x=element_text(angle=45,hjust = 1,size=7),
+                               title=element_text(size=10),
+                              axis.title.x=element_text(size=10),
+                              axis.title.y=element_text(size=10),
+                              axis.text.y=element_text(size=10))+
+  labs(x="City in US1",y="Total price(hundreds dollars)",
+       title = "Price trend of home-stay")
+```
+
+
+```{r}
+res <- dbSendQuery(conn = dcon, "
+SELECT SUM(substr(price, 2)) as totalprice,city
+from US2 
+group by city
+having totalprice > 100000;
+")
+mydf6 <- dbFetch(res, -1)
+dbClearResult(res)
+theme_set(theme_bw())  # pre-set the bw theme.
+f<-ggplot(mydf6, aes(x=city, y=totalprice/100)) + 
+  geom_bar(stat="identity", width=0.8, fill="#009E73")+
+theme1+
+theme(axis.text.x=element_text(angle=45,hjust = 1,size=10),
+                               title=element_text(size=10),
+                              axis.title.x=element_text(size=10),
+                              axis.title.y=element_text(size=10),
+                              axis.text.y=element_text(size=10))+
+  labs(x="City in US2",y="Total price(hundreds dollars)",
+       title = "Price trend of home-stay")
+```
+
+```{r}
+res <- dbSendQuery(conn = dcon, "
+SELECT SUM(substr(price, 2)) as totalprice,city
+from Others 
+group by city
+having totalprice > 130000;
+")
+mydf7 <- dbFetch(res, -1)
+dbClearResult(res)
+theme_set(theme_bw())  # pre-set the bw theme.
+g<-ggplot(mydf7, aes(x=city, y=totalprice/100)) + 
+  geom_bar(stat="identity", width=0.8, fill="#0072B2")+
+theme1+
+theme(axis.text.x=element_text(angle=45,hjust = 1,size=9),
+                               title=element_text(size=10),
+                              axis.title.x=element_text(size=10),
+                              axis.title.y=element_text(size=10),
+                              axis.text.y=element_text(size=10))+
+  labs(x="City in others",y="Total price(hundreds dollars)",
+       title = "Price trend of home-stay")
+```
+
+### Using grid to combine 6 plots.
+
+```{r}
+library(grid)
+library(gridBase)
+grid.newpage()
+pushViewport(viewport(layout=grid.layout(3,2)))
+print(a,vp = viewport(layout.pos.row=1,
+                      layout.pos.col=1))
+print(b,vp = viewport(layout.pos.row=1,
+                      layout.pos.col=2))
+print(c,vp = viewport(layout.pos.row=2,
+                      layout.pos.col=1))
+print(d,vp = viewport(layout.pos.row=2,
+                      layout.pos.col=2))
+print(f,vp = viewport(layout.pos.row=3,
+                      layout.pos.col=1))
+print(g,vp = viewport(layout.pos.row=3,
+                      layout.pos.col=2))
+```
+
+
+```{R,include=FALSE}
+library(gridExtra)
+library(ggplot2)
+library(grid)
+library(gridBase)
+```
+
+```{R}
+superhost <- read.csv(
+  "D:/Rproject/is_superhost.csv")
+```
+
+### Replacing ggplot with version done from scratch using grid
+
+```{R,echo=TRUE}
+# histogram using grid
+barData <- superhost$host_response_time
+## create function
+bp <- function(barData) {
+  #nmeasures <- nrow(barData)
+  # (barData <- matrix(sample(1:5, 25, replace=TRUE), ncol = 5))
+  # (boxColors <- 1:5)
+  grid.newpage()
+  nbars <- length(unique(barData))
+  l1 <- length(superhost$host_response_time[which(superhost$host_response_time==0)])
+  l2 <- length(superhost$host_response_time[which(superhost$host_response_time==1)])
+  l3 <- length(superhost$host_response_time[which(superhost$host_response_time==2)])
+  l4 <- length(superhost$host_response_time[which(superhost$host_response_time==3)])
+  l5 <- length(superhost$host_response_time[which(superhost$host_response_time==4)])
+  barTotals <- c(l1,l2,l3,l4,l5)
+  barYscale <- c(0, max(barTotals) * 1.05)
+  pushViewport(plotViewport(c(5.1, 4.1, 4.1, 2.1),
+                            yscale=barYscale,
+                            layout=grid.layout(1, nbars)))
+  grid.rect()
+  grid.yaxis()
+  ## i <- 2
+  
+  for (i in 1:nbars) {
+    pushViewport(viewport(layout.pos.col = i,
+                          yscale = barYscale))
+    grid.rect(x = rep(0.5, nbars),
+              y = unit(0,"native"),
+              height =unit(barTotals[i],"native"),
+              width = 0.9, just = "bottom",
+              gp = gpar(fill = "orange"))
+    grid.text(i, y = unit(-1, "lines"))
+    popViewport()
+  }
+  popViewport()
+}
+bp(barData)
+# histogram using ggplot 
+h<-ggplot(superhost)+aes(x=host_response_time)+
+  geom_histogram(stat = 'count')+
+  ylab("Score")+
+  ggtitle("Plot of Since Response Time")+
+  theme_bw()
+b <- bp(barData)
+pushViewport(viewport(layout = grid.layout(2, 1)))
+print(b ,vp=viewport(layout.pos.row = 1, layout.pos.col = 1))
+print(h,vp= viewport(layout.pos.row = 2, layout.pos.col = 1))
+
+```
+
+
+For comparison,ggplot is more clear and beautiful. The plot use grid can make us more clear to the procedure of making plots. From both plots, we can get the information we want.
+
+

@@ -1,0 +1,826 @@
+```{r}
+library(geosphere)
+library(stringr)
+library(dplyr)
+barcelona <- read.csv("/Users/dorothy/Downloads/R project/Barcelona.csv",header = TRUE,stringsAsFactors=FALSE)
+barcelona.new <- select(barcelona,id,name,host_is_superhost,longitude,latitude,accommodates,amenities,price,cancellation_policy)
+
+## La Sagrada Familia : 41.4036° N, 2.1744° E
+lat1 <- 41.4036
+lon1 <- 2.1744
+barcelona.new$D1 <- numeric(length(barcelona.new$id))
+for (i in 1:length(barcelona.new$id)){
+  barcelona.new$D1[i] <- distm (c(lon1, lat1),c(barcelona.new$longitude[i],barcelona.new$latitude[i]),fun = distHaversine)/ 1609
+}
+
+## Park Güell :  41.4145° N, 2.1527° E
+lat1 <- 41.4145
+lon1 <- 2.1527
+barcelona.new$D2 <- numeric(length(barcelona.new$id))
+for (i in 1:length(barcelona.new$id)){
+  barcelona.new$D2[i] <- distm (c(lon1, lat1),c(barcelona.new$longitude[i],barcelona.new$latitude[i]),fun = distHaversine)/ 1609
+}
+
+## Casa Milà :41.3954° N, 2.1620° E
+lat1 <- 41.3954
+lon1 <- 2.1620
+barcelona.new$D3 <- numeric(length(barcelona.new$id))
+for (i in 1:length(barcelona.new$id)){
+  barcelona.new$D3[i] <- distm (c(lon1, lat1),c(barcelona.new$longitude[i],barcelona.new$latitude[i]),fun = distHaversine)/ 1609
+}
+
+## Casa Batlló 41.3917° N, 2.1649° E
+lat1 <- 41.3917
+lon1 <- 2.1649
+barcelona.new$D4 <- numeric(length(barcelona.new$id))
+for (i in 1:length(barcelona.new$id)){
+  barcelona.new$D4[i] <- distm (c(lon1, lat1),c(barcelona.new$longitude[i],barcelona.new$latitude[i]),fun = distHaversine)/ 1609
+}
+
+## Mercado de La Boqueria 41.3817° N, 2.1716° E
+lat1 <- 41.3817
+lon1 <- 2.1716
+barcelona.new$D5 <- numeric(length(barcelona.new$id))
+for (i in 1:length(barcelona.new$id)){
+  barcelona.new$D5[i] <- distm (c(lon1, lat1),c(barcelona.new$longitude[i],barcelona.new$latitude[i]),fun = distHaversine)/ 1609
+}
+
+## calculate average distance
+## bound 1.5mile
+barcelona.new$average.d <- (barcelona.new$D1+barcelona.new$D2+barcelona.new$D3+barcelona.new$D4+barcelona.new$D5)/5
+barcelona.new$distance <- ifelse(barcelona.new$average.d<=1.5,1,0)
+
+## superhost
+barcelona.new$host_is_superhost <- ifelse(barcelona.new$host_is_superhost=="t",1,0)
+
+## standard length of amenities
+## longer better
+barcelona.new$amenities.length <- str_length(barcelona.new$amenities)
+Min <- min(barcelona.new$amenities.length)
+Max <- max(barcelona.new$amenities.length)
+barcelona.new$amenities.length.standard <- (barcelona.new$amenities.length-Min)/(Max-Min)
+
+## standard price
+## cheaper better
+barcelona.new$price <- as.numeric(gsub('[$,]', '', barcelona.new$price))
+Min.p <- min(barcelona.new$price)
+Max.p <- max(barcelona.new$price)
+barcelona.new$price.standard <- (Max.p-barcelona.new$price)/(Max.p-Min.p)
+## cancellation_policy
+## super_strict_60=1, super_strict_30=2, strict_14_with_grace_period=3,
+## moderate=4, flexible=5
+cancellation <- unique(barcelona.new$cancellation_policy)
+
+for (i in 1:length(barcelona.new$id)){
+  if (as.character(barcelona.new$cancellation_policy[i])=='super_strict_60'){
+    barcelona.new$cancellation[i] <- 1
+  }
+  if (as.character(barcelona.new$cancellation_policy[i])=='super_strict_30'){
+    barcelona.new$cancellation[i] <- 2
+  }
+  if (as.character(barcelona.new$cancellation_policy[i])=='strict_14_with_grace_period'){
+    barcelona.new$cancellation[i] <- 3
+  }
+  if (as.character(barcelona.new$cancellation_policy[i])=='strict'){
+    barcelona.new$cancellation[i] <- 4
+  }
+  if (as.character(barcelona.new$cancellation_policy[i])=='moderate'){
+    barcelona.new$cancellation[i] <- 5
+  }
+  if (as.character(barcelona.new$cancellation_policy[i])=='flexible'){
+    barcelona.new$cancellation[i] <- 6
+  }
+}
+
+## standard cancellation_policy
+## higher better
+unique(barcelona.new$cancellation_policy)
+barcelona.new$cancellation<-as.numeric(barcelona.new$cancellation)
+unique(barcelona.new$cancellation)
+Min.c <- min(barcelona.new$cancellation)
+Max.c <- max(barcelona.new$cancellation)
+barcelona.new$cancellation.standard <- (barcelona.new$cancellation-Min.c)/(Max.c-Min.c)
+
+## accommodates 
+unique(barcelona.new$accommodates)
+mean(barcelona.new$accommodates)
+median(barcelona.new$accommodates)
+## >3=0   <=3=1   different from each city  
+for (i in 1:length(barcelona.new$id)){
+  if (barcelona.new$accommodates[i]<=3){
+    barcelona.new$accommodates.stardand[i]=1
+  }
+  if (barcelona.new$accommodates[i]>3){
+    barcelona.new$accommodates.stardand[i]=0
+  }
+}
+
+
+## 
+## barcelona.new$host_is_superhost
+## barcelona.new$distance
+## barcelona.new$amenities.length.standard
+## barcelona.new$price.standard
+## barcelona.new$cancellation.standard
+## barcelona.new$accommodates.stardand
+
+## equal weight
+barcelona.new$equal.w <- (barcelona.new$host_is_superhost+barcelona.new$distance+
+                        barcelona.new$amenities.length.standard+barcelona.new$price.standard+
+                        barcelona.new$cancellation.standard+barcelona.new$accommodates.stardand)/6
+max(barcelona.new$equal.w)
+min(barcelona.new$equal.w)
+recommend.equal <- head(barcelona.new[order(barcelona.new$equal.w,decreasing=T),],10)
+
+cbind(recommend.equal$id,recommend.equal$longitude,recommend.equal$latitude,recommend.equal$name)
+
+## given weight, given by ourselves
+w1 <- 0.10  ## barcelona.new$host_is_superhost
+w2 <- 0.30  ## barcelona.new$distance
+w3 <- 0.25  ## barcelona.new$amenities.length.standard
+w4 <- 0.20 ## barcelona.new$price.standard
+w5 <- 0.10 ## barcelona.new$cancellation.standard
+w6 <- 0.05 ## barcelona.new$accommodates.stardand
+w1+w2+w3+w4+w5+w6
+barcelona.new$given.w <- w1*barcelona.new$host_is_superhost+w2*barcelona.new$distance+
+  w3*barcelona.new$amenities.length.standard+w4*barcelona.new$price.standard+
+  w5*barcelona.new$cancellation.standard+w6*barcelona.new$accommodates.stardand
+max(barcelona.new$given.w)
+min(barcelona.new$given.w)
+recommend.given <- head(barcelona.new[order(barcelona.new$given.w,decreasing=T),],10)
+cbind(recommend.given$id,recommend.given$longitude,recommend.given$latitude,recommend.given$name)
+write.csv(recommend.given, file = "/Users/dorothy/Downloads/R project/barcelona rec.csv")
+bar1<-select(recommend.equal,id,longitude,latitude)
+write.csv(bar1, file = "/Users/dorothy/Downloads/R project/barcelonaequal.csv")
+recommend.give$id<-as.factor(recommend.give$id)
+ggplot(recommend.given, aes(x=as.factor(id),y=given.w)) + 
+  geom_bar(stat="identity", width=0.8, fill="#E69F00")+
+  geom_text(aes(label=round(given.w, digits=2)),position=position_dodge(width=0.8))+
+  theme1+
+  theme(axis.text.x=element_text(angle=45,hjust = 1,size=9),
+        title=element_text(size=10),
+        axis.title.x=element_text(size=10),
+        axis.title.y=element_text(size=10),
+        axis.text.y=element_text(size=10))+
+  labs(x="home-stay",y="recommendated degree",
+       title = "Barcelona")+
+coord_flip()
+library(geosphere)
+library(stringr)
+library(dplyr)
+ny <- read.csv("/Users/dorothy/Downloads/R project/NewYork.csv",header = TRUE,stringsAsFactors=FALSE)
+ny.new <- select(ny,id,name,host_is_superhost,longitude,latitude,accommodates,amenities,price,cancellation_policy)
+ny.new$longitude <- abs(ny.new$longitude)
+## Statue of Liberty National Monument: 40.6892° N, 74.0445° W
+lat1 <- 40.6892
+lon1 <- 74.0445
+ny.new$D1 <- numeric(length(ny.new$id))
+for (i in 1:length(ny.new$id)){
+  ny.new$D1[i] <- distm (c(lon1, lat1),c(ny.new$longitude[i],ny.new$latitude[i]),fun = distHaversine)/ 1609
+}
+
+## Central Park :  40.7829° N, 73.9654° W
+lat1 <- 40.7829
+lon1 <- 73.9654
+ny.new$D2 <- numeric(length(ny.new$id))
+for (i in 1:length(ny.new$id)){
+  ny.new$D2[i] <- distm (c(lon1, lat1),c(ny.new$longitude[i],ny.new$latitude[i]),fun = distHaversine)/ 1609
+}
+
+## Times Square :40.7580° N, 73.9855° W
+lat1 <- 40.7580
+lon1 <- 73.9855
+ny.new$D3 <- numeric(length(ny.new$id))
+for (i in 1:length(ny.new$id)){
+  ny.new$D3[i] <- distm (c(lon1, lat1),c(ny.new$longitude[i],ny.new$latitude[i]),fun = distHaversine)/ 1609
+}
+
+## Rockefeller Center 40.7587° N, 73.9787° W
+lat1 <- 40.7587
+lon1 <- 73.9787
+ny.new$D4 <- numeric(length(ny.new$id))
+for (i in 1:length(ny.new$id)){
+  ny.new$D4[i] <- distm (c(lon1, lat1),c(ny.new$longitude[i],ny.new$latitude[i]),fun = distHaversine)/ 1609
+}
+
+## Brooklyn Bridge 40.7061° N, 73.9969° W
+lat1 <- 40.7061
+lon1 <- 73.9969
+ny.new$D5 <- numeric(length(ny.new$id))
+for (i in 1:length(ny.new$id)){
+  ny.new$D5[i] <- distm (c(lon1, lat1),c(ny.new$longitude[i],ny.new$latitude[i]),fun = distHaversine)/ 1609
+}
+
+## calculate average distance
+## bound 1.5mile
+ny.new$average.d <- (ny.new$D1+ny.new$D2+ny.new$D3+ny.new$D4+ny.new$D5)/5
+ny.new$distance <- ifelse(ny.new$average.d<=1.5,1,0)
+
+## superhost
+ny.new$host_is_superhost <- ifelse(ny.new$host_is_superhost=="t",1,0)
+
+## standard length of amenities
+## longer better
+ny.new$amenities.length <- str_length(ny.new$amenities)
+Min <- min(ny.new$amenities.length)
+Max <- max(ny.new$amenities.length)
+ny.new$amenities.length.standard <- (ny.new$amenities.length-Min)/(Max-Min)
+
+## standard price
+## cheaper better
+ny.new$price <- as.numeric(gsub('[$,]', '', ny.new$price))
+Min.p <- min(ny.new$price)
+Max.p <- max(ny.new$price)
+ny.new$price.standard <- (Max.p-ny.new$price)/(Max.p-Min.p)
+## cancellation_policy
+## super_strict_60=1, super_strict_30=2, strict_14_with_grace_period=3,
+## moderate=4, flexible=5
+cancellation <- unique(ny.new$cancellation_policy)
+
+for (i in 1:length(ny.new$id)){
+  if (as.character(ny.new$cancellation_policy[i])=='super_strict_60'){
+    ny.new$cancellation[i] <- 1
+  }
+  if (as.character(ny.new$cancellation_policy[i])=='super_strict_30'){
+    ny.new$cancellation[i] <- 2
+  }
+  if (as.character(ny.new$cancellation_policy[i])=='strict_14_with_grace_period'){
+    ny.new$cancellation[i] <- 3
+  }
+  if (as.character(ny.new$cancellation_policy[i])=='strict'){
+    ny.new$cancellation[i] <- 4
+  }
+  if (as.character(ny.new$cancellation_policy[i])=='moderate'){
+    ny.new$cancellation[i] <- 5
+  }
+  if (as.character(ny.new$cancellation_policy[i])=='flexible'){
+    ny.new$cancellation[i] <- 6
+  }
+  
+}
+
+## standard cancellation_policy
+## higher better
+unique(ny.new$cancellation_policy)
+ny.new$cancellation<-as.numeric(ny.new$cancellation)
+unique(ny.new$cancellation)
+Min.c <- min(ny.new$cancellation)
+Max.c <- max(ny.new$cancellation)
+ny.new$cancellation.standard <- (ny.new$cancellation-Min.c)/(Max.c-Min.c)
+
+## accommodates 
+unique(ny.new$accommodates)
+mean(ny.new$accommodates)
+median(ny.new$accommodates)
+## >3=0   <=3=1   different from each city  
+for (i in 1:length(ny.new$id)){
+  if (ny.new$accommodates[i]<=3){
+    ny.new$accommodates.stardand[i]=1
+  }
+  if (ny.new$accommodates[i]>3){
+    ny.new$accommodates.stardand[i]=0
+  }
+}
+
+
+## 
+## ny.new$host_is_superhost
+## ny.new$distance
+## ny.new$amenities.length.standard
+## ny.new$price.standard
+## ny.new$cancellation.standard
+## ny.new$accommodates.stardand
+
+## equal weight
+ny.new$equal.w <- (ny.new$host_is_superhost+ny.new$distance+
+                     ny.new$amenities.length.standard+ny.new$price.standard+
+                     ny.new$cancellation.standard+ny.new$accommodates.stardand)/6
+max(ny.new$equal.w)
+min(ny.new$equal.w)
+recommend.equal <- head(ny.new[order(ny.new$equal.w,decreasing=T),],10)
+
+cbind(recommend.equal$id,recommend.equal$longitude,recommend.equal$latitude,recommend.equal$name)
+
+## given weight, given by ourselves
+w1 <- 0.10  ## ny.new$host_is_superhost
+w2 <- 0.30  ## ny.new$distance
+w3 <- 0.25  ## ny.new$amenities.length.standard
+w4 <- 0.20 ## ny.new$price.standard
+w5 <- 0.10 ## ny.new$cancellation.standard
+w6 <- 0.05 ## ny.new$accommodates.stardand
+w1+w2+w3+w4+w5+w6
+ny.new$given.w <- w1*ny.new$host_is_superhost+w2*ny.new$distance+
+  w3*ny.new$amenities.length.standard+w4*ny.new$price.standard+
+  w5*ny.new$cancellation.standard+w6*ny.new$accommodates.stardand
+max(ny.new$given.w)
+min(ny.new$given.w)
+recommend.given <- head(ny.new[order(ny.new$given.w,decreasing=T),],10)
+cbind(recommend.given$id,recommend.given$longitude,recommend.given$latitude,recommend.given$name)
+write.csv(recommend.given, file = "/Users/dorothy/Downloads/R project/newyork rec.csv")
+ny1<-select(recommend.equal,id,longitude,latitude)
+write.csv(ny1, file = "/Users/dorothy/Downloads/R project/newyorkequal.csv")
+ggplot(recommend.given, aes(x=as.factor(id),y=given.w)) + 
+  geom_bar(stat="identity", width=0.8, fill="#999999")+
+  geom_text(aes(label=round(given.w, digits=2),col='red'),position=position_dodge(width=0.8))+
+  theme1+
+  theme(axis.text.x=element_text(angle=45,hjust = 1,size=9),
+        title=element_text(size=10),
+        axis.title.x=element_text(size=10),
+        axis.title.y=element_text(size=10),
+        axis.text.y=element_text(size=10))+
+  labs(x="home-stay",y="recommendated degree",
+       title = "NewYork")+
+  coord_flip()
+install.packages("geosphere")
+library(geosphere)
+library(stringr)
+library(dplyr)
+amsterdam <- read.csv("/Users/dorothy/Downloads/Amsterdam1.csv",header = TRUE,stringsAsFactors=FALSE)
+amsterdam.new <- select(amsterdam,id,host_is_superhost,longitude,latitude,accommodates,amenities,price,cancellation_policy)
+
+## Rijksmuseum : 52.359875. 4.885058
+lat1 <- 52.359875
+lon1 <- 4.885058
+amsterdam.new$D1 <- numeric(length(amsterdam.new$id))
+for (i in 1:length(amsterdam.new$id)){
+  amsterdam.new$D1[i] <- distm (c(lon1, lat1),c(amsterdam.new$longitude[i],amsterdam.new$latitude[i]),fun = distHaversine)/ 1609
+}
+
+## Dam Square :  52.373°N 4.893°E
+lat1 <- 52.373
+lon1 <- 4.893
+amsterdam.new$D2 <- numeric(length(amsterdam.new$id))
+for (i in 1:length(amsterdam.new$id)){
+  amsterdam.new$D2[i] <- distm (c(lon1, lat1),c(amsterdam.new$longitude[i],amsterdam.new$latitude[i]),fun = distHaversine)/ 1609
+}
+
+## Rembrandt House Museum :52.3694° N, 4.9012° E
+lat1 <- 52.3694
+lon1 <- 4.9012
+amsterdam.new$D3 <- numeric(length(amsterdam.new$id))
+for (i in 1:length(amsterdam.new$id)){
+  amsterdam.new$D3[i] <- distm (c(lon1, lat1),c(amsterdam.new$longitude[i],amsterdam.new$latitude[i]),fun = distHaversine)/ 1609
+}
+
+## The Begijnhof 52.3696° N, 4.8901° E
+lat1 <- 52.3696
+lon1 <- 4.8901
+amsterdam.new$D4 <- numeric(length(amsterdam.new$id))
+for (i in 1:length(amsterdam.new$id)){
+  amsterdam.new$D4[i] <- distm (c(lon1, lat1),c(amsterdam.new$longitude[i],amsterdam.new$latitude[i]),fun = distHaversine)/ 1609
+}
+
+## vondelpark 52.3580° N, 4.8686° E
+lat1 <- 52.3580
+lon1 <- 4.8686
+amsterdam.new$D5 <- numeric(length(amsterdam.new$id))
+for (i in 1:length(amsterdam.new$id)){
+  amsterdam.new$D5[i] <- distm (c(lon1, lat1),c(amsterdam.new$longitude[i],amsterdam.new$latitude[i]),fun = distHaversine)/ 1609
+}
+
+## calculate average distance
+## bound 1.5mile
+amsterdam.new$average.d <- (amsterdam.new$D1+amsterdam.new$D2+amsterdam.new$D3+amsterdam.new$D4+amsterdam.new$D5)/5
+amsterdam.new$distance <- ifelse(amsterdam.new$average.d<=1.5,1,0)
+
+## superhost
+amsterdam.new$host_is_superhost <- ifelse(amsterdam.new$host_is_superhost=="t",1,0)
+
+## standard length of amenities
+## longer better
+amsterdam.new$amenities.length <- str_length(amsterdam.new$amenities)
+Min <- min(amsterdam.new$amenities.length)
+Max <- max(amsterdam.new$amenities.length)
+amsterdam.new$amenities.length.standard <- (amsterdam.new$amenities.length-Min)/(Max-Min)
+
+## standard price
+## cheaper better
+amsterdam.new$price <- as.numeric(gsub('[$,]', '', amsterdam.new$price))
+Min.p <- min(amsterdam.new$price)
+Max.p <- max(amsterdam.new$price)
+amsterdam.new$price.standard <- (Max.p-amsterdam.new$price)/(Max.p-Min.p)
+
+## cancellation_policy
+## super_strict_60=1, super_strict_30=2, strict_14_with_grace_period=3,
+## moderate=4, flexible=5
+cancellation <- unique(amsterdam.new$cancellation_policy)
+for (i in 1:length(amsterdam.new$id)){
+  if (as.character(amsterdam.new$cancellation_policy[i])=='super_strict_60'){
+    amsterdam.new$cancellation[i] <- 1
+  }
+  if (as.character(amsterdam.new$cancellation_policy[i])=='super_strict_30'){
+    amsterdam.new$cancellation[i] <- 2
+  }
+  if (as.character(amsterdam.new$cancellation_policy[i])=='strict_14_with_grace_period'){
+    amsterdam.new$cancellation[i] <- 3
+  }
+  if (as.character(amsterdam.new$cancellation_policy[i])=='moderate'){
+    amsterdam.new$cancellation[i] <- 4
+  }
+  if (as.character(amsterdam.new$cancellation_policy[i])=='flexible'){
+    amsterdam.new$cancellation[i] <- 5
+  }
+}
+
+## standard cancellation_policy
+## higher better
+Min.c <- min(as.numeric(amsterdam.new$cancellation))
+Max.c <- max(as.numeric(amsterdam.new$cancellation))
+amsterdam.new$cancellation.standard <- (as.numeric(amsterdam.new$cancellation)-Min.c)/(Max.c-Min.c)
+
+## accommodates 
+unique(amsterdam.new$accommodates)
+mean(amsterdam.new$accommodates)
+median(amsterdam.new$accommodates)
+## >3=0   <=3=1   different from each city  
+for (i in 1:length(amsterdam.new$id)){
+  if (amsterdam.new$accommodates[i]<=3){
+    amsterdam.new$accommodates.stardand[i]=1
+  }
+  if (amsterdam.new$accommodates[i]>3){
+    amsterdam.new$accommodates.stardand[i]=0
+  }
+}
+
+
+## 
+## amsterdam.new$host_is_superhost
+## amsterdam.new$distance
+## amsterdam.new$amenities.length.standard
+## amsterdam.new$price.standard
+## amsterdam.new$cancellation.standard
+## amsterdam.new$accommodates.stardand
+
+## equal weight
+amsterdam.new$equal.w = (amsterdam.new$host_is_superhost+amsterdam.new$distance+
+                           amsterdam.new$amenities.length.standard+amsterdam.new$price.standard+
+                           amsterdam.new$cancellation.standard+amsterdam.new$accommodates.stardand)/6
+max(amsterdam.new$equal.w)
+min(amsterdam.new$equal.w)
+recommend.equal <- head(amsterdam.new[order(amsterdam.new$equal.w,decreasing=T),],10)
+cbind(recommend.equal$id,recommend.equal$longitude,recommend.equal$latitude)
+
+## given weight, given by ourselves
+w1 <- 0.10  ## amsterdam.new$host_is_superhost
+w2 <- 0.30  ## amsterdam.new$distance
+w3 <- 0.25  ## amsterdam.new$amenities.length.standard
+w4 <- 0.20 ## amsterdam.new$price.standard
+w5 <- 0.10 ## amsterdam.new$cancellation.standard
+w6 <- 0.05 ## amsterdam.new$accommodates.stardand
+w1+w2+w3+w4+w5+w6
+amsterdam.new$given.w <- w1*amsterdam.new$host_is_superhost+w2*amsterdam.new$distance+
+  w3*amsterdam.new$amenities.length.standard+w4*amsterdam.new$price.standard+
+  w5*amsterdam.new$cancellation.standard+w6*amsterdam.new$accommodates.stardand
+max(amsterdam.new$given.w)
+min(amsterdam.new$given.w)
+recommend.given <- head(amsterdam.new[order(amsterdam.new$given.w,decreasing=T),],10)
+cbind(recommend.given$id,recommend.given$longitude,recommend.given$latitude)
+```
+```{r}
+library(geosphere)
+library(stringr)
+library(dplyr)
+library(ggplot2)
+paris <- read.csv("/Users/dorothy/Downloads/R project/Paris.csv",header = TRUE,stringsAsFactors=FALSE)
+paris.new <- select(paris,id,name,host_is_superhost,longitude,latitude,accommodates,amenities,price,cancellation_policy)
+
+## Eiffel Tower : 48.8584. 2.2945
+lat1 <- 48.8584
+lon1 <- 2.2945
+paris.new$D1 <- numeric(length(paris.new$id))
+for (i in 1:length(paris.new$id)){
+  paris.new$D1[i] <- distm (c(lon1, lat1),c(paris.new$longitude[i],paris.new$latitude[i]),fun = distHaversine)/ 1609
+}
+
+## Louvre Musemu :  48.8606°N 2.3376°E
+lat1 <- 48.8606
+lon1 <- 2.3376
+paris.new$D2 <- numeric(length(paris.new$id))
+for (i in 1:length(paris.new$id)){
+  paris.new$D2[i] <- distm (c(lon1, lat1),c(paris.new$longitude[i],paris.new$latitude[i]),fun = distHaversine)/ 1609
+}
+
+## Cathedrale :48.8530° N, 2.3499° E
+lat1 <- 48.8530
+lon1 <- 2.3499
+paris.new$D3 <- numeric(length(paris.new$id))
+for (i in 1:length(paris.new$id)){
+  paris.new$D3[i] <- distm (c(lon1, lat1),c(paris.new$longitude[i],paris.new$latitude[i]),fun = distHaversine)/ 1609
+}
+
+## Arc de Triomphe 48.8738° N, 2.2950° E
+lat1 <- 48.8738
+lon1 <- 2.2950
+paris.new$D4 <- numeric(length(paris.new$id))
+for (i in 1:length(paris.new$id)){
+  paris.new$D4[i] <- distm (c(lon1, lat1),c(paris.new$longitude[i],paris.new$latitude[i]),fun = distHaversine)/ 1609
+}
+
+## Sacré-Cœur 48.8867° N, 2.3431° E
+lat1 <- 48.8867
+lon1 <- 2.3431
+paris.new$D5 <- numeric(length(paris.new$id))
+for (i in 1:length(paris.new$id)){
+  paris.new$D5[i] <- distm (c(lon1, lat1),c(paris.new$longitude[i],paris.new$latitude[i]),fun = distHaversine)/ 1609
+}
+
+## calculate average distance
+## bound 1.5mile
+paris.new$average.d <- (paris.new$D1+paris.new$D2+paris.new$D3+paris.new$D4+paris.new$D5)/5
+paris.new$distance <- ifelse(paris.new$average.d<=1.5,1,0)
+
+## superhost
+paris.new$host_is_superhost <- ifelse(paris.new$host_is_superhost=="t",1,0)
+
+## standard length of amenities
+## longer better
+paris.new$amenities.length <- str_length(paris.new$amenities)
+Min <- min(paris.new$amenities.length)
+Max <- max(paris.new$amenities.length)
+paris.new$amenities.length.standard <- (paris.new$amenities.length-Min)/(Max-Min)
+
+## standard price
+## cheaper better
+paris.new$price <- as.numeric(gsub('[$,]', '', paris.new$price))
+Min.p <- min(paris.new$price)
+Max.p <- max(paris.new$price)
+paris.new$price.standard <- (Max.p-paris.new$price)/(Max.p-Min.p)
+## cancellation_policy
+## super_strict_60=1, super_strict_30=2, strict_14_with_grace_period=3,
+## moderate=4, flexible=5
+cancellation <- unique(paris.new$cancellation_policy)
+
+for (i in 1:length(paris.new$id)){
+  if (as.character(paris.new$cancellation_policy[i])=='luxury_super_strict_95'){
+    paris.new$cancellation[i] <- 1
+  }
+  if (as.character(paris.new$cancellation_policy[i])=='super_strict_60'){
+    paris.new$cancellation[i] <- 2
+  }
+  if (as.character(paris.new$cancellation_policy[i])=='super_strict_30'){
+    paris.new$cancellation[i] <- 3
+  }
+  if (as.character(paris.new$cancellation_policy[i])=='strict_14_with_grace_period'){
+    paris.new$cancellation[i] <- 4
+  }
+  if (as.character(paris.new$cancellation_policy[i])=='strict'){
+    paris.new$cancellation[i] <- 5
+  }
+  if (as.character(paris.new$cancellation_policy[i])=='moderate'){
+    paris.new$cancellation[i] <- 6
+  }
+  if (as.character(paris.new$cancellation_policy[i])=='flexible'){
+    paris.new$cancellation[i] <- 7
+  }
+}
+
+## standard cancellation_policy
+## higher better
+unique(paris.new$cancellation_policy)
+paris.new$cancellation<-as.numeric(paris.new$cancellation)
+unique(paris.new$cancellation)
+Min.c <- min(paris.new$cancellation)
+Max.c <- max(paris.new$cancellation)
+paris.new$cancellation.standard <- (paris.new$cancellation-Min.c)/(Max.c-Min.c)
+
+## accommodates 
+unique(paris.new$accommodates)
+mean(paris.new$accommodates)
+median(paris.new$accommodates)
+## >3=0   <=3=1   different from each city  
+for (i in 1:length(paris.new$id)){
+  if (paris.new$accommodates[i]<=3){
+    paris.new$accommodates.stardand[i]=1
+  }
+  if (paris.new$accommodates[i]>3){
+    paris.new$accommodates.stardand[i]=0
+  }
+}
+
+
+## 
+## paris.new$host_is_superhost
+## paris.new$distance
+## paris.new$amenities.length.standard
+## paris.new$price.standard
+## paris.new$cancellation.standard
+## paris.new$accommodates.stardand
+
+## equal weight
+paris.new$equal.w <- (paris.new$host_is_superhost+paris.new$distance+
+                        paris.new$amenities.length.standard+paris.new$price.standard+
+                        paris.new$cancellation.standard+paris.new$accommodates.stardand)/6
+max(paris.new$equal.w)
+min(paris.new$equal.w)
+recommend.equal <- head(paris.new[order(paris.new$equal.w,decreasing=T),],10)
+cbind(recommend.equal$id,recommend.equal$longitude,recommend.equal$latitude,recommend.equal$name)
+
+## given weight, given by ourselves
+w1 <- 0.10  ## paris.new$host_is_superhost
+w2 <- 0.30  ## paris.new$distance
+w3 <- 0.25  ## paris.new$amenities.length.standard
+w4 <- 0.20 ## paris.new$price.standard
+w5 <- 0.10 ## paris.new$cancellation.standard
+w6 <- 0.05 ## paris.new$accommodates.stardand
+w1+w2+w3+w4+w5+w6
+paris.new$given.w <- w1*paris.new$host_is_superhost+w2*paris.new$distance+
+  w3*paris.new$amenities.length.standard+w4*paris.new$price.standard+
+  w5*paris.new$cancellation.standard+w6*paris.new$accommodates.stardand
+max(paris.new$given.w)
+min(paris.new$given.w)
+recommend.given <- head(paris.new[order(paris.new$given.w,decreasing=T),],10)
+cbind(recommend.given$id,recommend.given$longitude,recommend.given$name)
+write.csv(recommend.given, file = "/Users/dorothy/Downloads/R project/paris rec.csv")
+paris1<-select(recommend.equal,id,longitude,latitude)
+write.csv(paris1, file = "/Users/dorothy/Downloads/R project/parisequal.csv")
+
+
+ggplot(recommend.given, aes(x=as.factor(id),y=given.w)) + 
+  geom_bar(stat="identity", width=0.8, fill="#CC79A7")+
+  geom_text(aes(label=round(given.w, digits=2)),position=position_dodge(width=0.8))+
+  theme1+
+  theme(axis.text.x=element_text(angle=45,hjust = 1,size=9),
+        title=element_text(size=10),
+        axis.title.x=element_text(size=10),
+        axis.title.y=element_text(size=10),
+        axis.text.y=element_text(size=10))+
+  labs(x="home-stay",y="recommendated degree",
+       title = "Paris")+
+  coord_flip()
+
+hist(recommend.given$given.w)
+
+library(geosphere)
+library(stringr)
+library(dplyr)
+london <- read.csv("/Users/dorothy/Downloads/R project/London.csv",header = TRUE,stringsAsFactors=FALSE)
+london.new <- select(london,id,name,host_is_superhost,longitude,latitude,accommodates,amenities,price,cancellation_policy)
+london.new$longitude <- abs(london.new$longitude)
+## Big Ben : 51.5007° N, 0.1246° W
+lat1 <- 51.5007
+lon1 <- 0.1246
+london.new$D1 <- numeric(length(london.new$id))
+for (i in 1:length(london.new$id)){
+  london.new$D1[i] <- distm (c(lon1, lat1),c(london.new$longitude[i],london.new$latitude[i]),fun = distHaversine)/ 1609
+}
+
+## Coca-Cola London Eye :  51.5033° N, 0.1195° W
+lat1 <- 51.5033
+lon1 <- 0.1195
+london.new$D2 <- numeric(length(london.new$id))
+for (i in 1:length(london.new$id)){
+  london.new$D2[i] <- distm (c(lon1, lat1),c(london.new$longitude[i],london.new$latitude[i]),fun = distHaversine)/ 1609
+}
+
+## Tower of London :51.5081° N, 0.0759° W
+lat1 <- 51.5081
+lon1 <- 0.0759
+london.new$D3 <- numeric(length(london.new$id))
+for (i in 1:length(london.new$id)){
+  london.new$D3[i] <- distm (c(lon1, lat1),c(london.new$longitude[i],london.new$latitude[i]),fun = distHaversine)/ 1609
+}
+
+## Tower Bridge 51.5055° N, 0.0754° W
+lat1 <- 51.5055
+lon1 <- 0.0754
+london.new$D4 <- numeric(length(london.new$id))
+for (i in 1:length(london.new$id)){
+  london.new$D4[i] <- distm (c(lon1, lat1),c(london.new$longitude[i],london.new$latitude[i]),fun = distHaversine)/ 1609
+}
+
+## Buckingham Palace 51.5014° N, 0.1419° W
+lat1 <- 51.5014
+lon1 <- 0.1419
+london.new$D5 <- numeric(length(london.new$id))
+for (i in 1:length(london.new$id)){
+  london.new$D5[i] <- distm (c(lon1, lat1),c(london.new$longitude[i],london.new$latitude[i]),fun = distHaversine)/ 1609
+}
+
+## calculate average distance
+## bound 1.5mile
+london.new$average.d <- (london.new$D1+london.new$D2+london.new$D3+london.new$D4+london.new$D5)/5
+london.new$distance <- ifelse(london.new$average.d<=1.5,1,0)
+
+## superhost
+london.new$host_is_superhost <- ifelse(london.new$host_is_superhost=="t",1,0)
+
+## standard length of amenities
+## longer better
+london.new$amenities.length <- str_length(london.new$amenities)
+Min <- min(london.new$amenities.length)
+Max <- max(london.new$amenities.length)
+london.new$amenities.length.standard <- (london.new$amenities.length-Min)/(Max-Min)
+
+## standard price
+## cheaper better
+london.new$price <- as.numeric(gsub('[$,]', '', london.new$price))
+Min.p <- min(london.new$price)
+Max.p <- max(london.new$price)
+london.new$price.standard <- (Max.p-london.new$price)/(Max.p-Min.p)
+## cancellation_policy
+## super_strict_60=1, super_strict_30=2, strict_14_with_grace_period=3,
+## moderate=4, flexible=5
+cancellation <- unique(london.new$cancellation_policy)
+
+for (i in 1:length(london.new$id)){
+  if (as.character(london.new$cancellation_policy[i])=='luxury_super_strict_95'){
+    london.new$cancellation[i] <- 1
+  }
+  if (as.character(london.new$cancellation_policy[i])=='super_strict_60'){
+    london.new$cancellation[i] <- 2
+  }
+  if (as.character(london.new$cancellation_policy[i])=='super_strict_30'){
+    london.new$cancellation[i] <- 3
+  }
+  if (as.character(london.new$cancellation_policy[i])=='strict_14_with_grace_period'){
+    london.new$cancellation[i] <- 4
+  }
+  if (as.character(london.new$cancellation_policy[i])=='strict'){
+    london.new$cancellation[i] <- 5
+  }
+  if (as.character(london.new$cancellation_policy[i])=='moderate'){
+    london.new$cancellation[i] <- 6
+  }
+  if (as.character(london.new$cancellation_policy[i])=='flexible'){
+    london.new$cancellation[i] <- 7
+  }
+  if (as.character(london.new$cancellation_policy[i])=='luxury_moderate'){
+    london.new$cancellation[i] <- 8
+  }
+}
+
+## standard cancellation_policy
+## higher better
+unique(london.new$cancellation_policy)
+london.new$cancellation<-as.numeric(london.new$cancellation)
+unique(london.new$cancellation)
+Min.c <- min(london.new$cancellation)
+Max.c <- max(london.new$cancellation)
+london.new$cancellation.standard <- (london.new$cancellation-Min.c)/(Max.c-Min.c)
+
+## accommodates 
+unique(london.new$accommodates)
+mean(london.new$accommodates)
+median(london.new$accommodates)
+## >3=0   <=3=1   different from each city  
+for (i in 1:length(london.new$id)){
+  if (london.new$accommodates[i]<=3){
+    london.new$accommodates.stardand[i]=1
+  }
+  if (london.new$accommodates[i]>3){
+    london.new$accommodates.stardand[i]=0
+  }
+}
+
+
+## 
+## london.new$host_is_superhost
+## london.new$distance
+## london.new$amenities.length.standard
+## london.new$price.standard
+## london.new$cancellation.standard
+## london.new$accommodates.stardand
+
+## equal weight
+london.new$equal.w <- (london.new$host_is_superhost+london.new$distance+
+                         london.new$amenities.length.standard+london.new$price.standard+
+                         london.new$cancellation.standard+london.new$accommodates.stardand)/6
+max(london.new$equal.w)
+min(london.new$equal.w)
+recommend.equal <- head(london.new[order(london.new$equal.w,decreasing=T),],10)
+
+cbind(recommend.equal$id,recommend.equal$longitude,recommend.equal$latitude,recommend.equal$name)
+
+## given weight, given by ourselves
+w1 <- 0.10  ## london.new$host_is_superhost
+w2 <- 0.30  ## london.new$distance
+w3 <- 0.25  ## london.new$amenities.length.standard
+w4 <- 0.20 ## london.new$price.standard
+w5 <- 0.10 ## london.new$cancellation.standard
+w6 <- 0.05 ## london.new$accommodates.stardand
+w1+w2+w3+w4+w5+w6
+london.new$given.w <- w1*london.new$host_is_superhost+w2*london.new$distance+
+  w3*london.new$amenities.length.standard+w4*london.new$price.standard+
+  w5*london.new$cancellation.standard+w6*london.new$accommodates.stardand
+max(london.new$given.w)
+min(london.new$given.w)
+recommend.given <- head(london.new[order(london.new$given.w,decreasing=T),],10)
+cbind(recommend.given$id,recommend.given$longitude,recommend.given$latitude,recommend.given$name)
+write.csv(recommend.given, file = "/Users/dorothy/Downloads/R project/london rec.csv")
+london1<-select(recommend.equal,id,longitude,latitude)
+write.csv(london1, file = "/Users/dorothy/Downloads/R project/londonequal.csv")
+
+ggplot(recommend.given, aes(x=as.factor(id),y=given.w)) + 
+  geom_bar(stat="identity", width=0.8, fill="#009E73")+
+  geom_text(aes(label=round(given.w, digits=2)),position=position_dodge(width=0.8))+
+  theme1+
+  theme(axis.text.x=element_text(angle=45,hjust = 1,size=9),
+        title=element_text(size=10),
+        axis.title.x=element_text(size=10),
+        axis.title.y=element_text(size=10),
+        axis.text.y=element_text(size=10))+
+  labs(x="home-stay",y="recommendated degree",
+       title = "London")+
+  coord_flip()
+```
+
